@@ -1,26 +1,356 @@
 @import "tailwindcss";
 
+/*
+ * 明暗主题采用 class 切换（theme-toggle 组件写 <html class="dark">），
+ * 而不是跟随系统 —— Tailwind v4 默认的 dark 变体是 prefers-color-scheme。
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ==========================================================================
+   设计令牌 · 唯一来源
+   色值取自设计稿（docs/design），需求文档 07 章与此处一一对应。
+   ========================================================================== */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* 底色与容器 */
+  --paper: #f5f0e6;
+  --card: #faf6ee;
+  --chip: #ede5d5;
+
+  /* 描边 */
+  --line: #e5ddc5;
+  --line-strong: #cfc4a8;
+
+  /* 文字层级 */
+  --ink: #2a2118;
+  --ink-body: #3a2f22;
+  --ink-muted: #6b5b45;
+  --ink-faint: #8a7c63;
+  --ink-ghost: #a79b80;
+
+  /* 强调色（全站唯一），同时用作深色代码块底色 */
+  --accent: #6b5b45;
+  --accent-contrast: #faf6ee;
+  --code-bg: #2a2118;
+  --code-text: #e6deca;
+}
+
+.dark {
+  --paper: #17130e;
+  --card: #201a13;
+  --chip: #2a2318;
+
+  --line: #352c1f;
+  --line-strong: #4a3d2b;
+
+  --ink: #f0e9dc;
+  --ink-body: #ddd3c1;
+  --ink-muted: #b3a68c;
+  --ink-faint: #8a7c63;
+  --ink-ghost: #6b5b45;
+
+  --accent: #c9b48c;
+  --accent-contrast: #17130e;
+  --code-bg: #0f0c08;
+  --code-text: #e6deca;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-chip: var(--chip);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-ink: var(--ink);
+  --color-ink-body: var(--ink-body);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-ink-ghost: var(--ink-ghost);
+
+  --color-accent: var(--accent);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-code: var(--code-bg);
+  --color-code-text: var(--code-text);
+
+  /* 字体：标题衬线 / 正文无衬线 / 眉标与数字等宽 */
+  --font-serif: "Source Han Serif CN", "Source Han Serif SC", "Noto Serif SC",
+    "Songti SC", "STSong", "SimSun", serif;
+  --font-sans: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Heiti SC", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo,
+    "Cascadia Mono", monospace;
+
+  /* 圆角：设计规范 ≤ 4px */
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 4px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ==========================================================================
+   基础样式
+   ========================================================================== */
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--paper);
+  color: var(--ink-body);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.75;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background-color: var(--chip);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 滚动条：细、低对比，不打断阅读 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+/* ==========================================================================
+   眉标 / 小字：等宽 + 大字距，设计稿里的固定语汇
+   ========================================================================== */
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+/* ==========================================================================
+   正文排版（文章详情）
+   阅读列宽 ≤ 680px，正文 16–18px，行高 1.75
+   ========================================================================== */
+
+.prose-editorial {
+  font-size: 17px;
+  line-height: 1.75;
+  color: var(--ink-body);
+}
+
+.prose-editorial > * + * {
+  margin-top: 1.25em;
+}
+
+.prose-editorial h2,
+.prose-editorial h3,
+.prose-editorial h4 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  color: var(--ink);
+  scroll-margin-top: 88px;
+}
+
+.prose-editorial h2 {
+  font-size: 24px;
+  line-height: 1.4;
+  margin-top: 2.4em;
+}
+
+.prose-editorial h3 {
+  font-size: 20px;
+  line-height: 1.45;
+  margin-top: 2em;
+}
+
+.prose-editorial h4 {
+  font-size: 17px;
+  line-height: 1.5;
+  margin-top: 1.8em;
+}
+
+.prose-editorial p {
+  margin-top: 1.25em;
+}
+
+.prose-editorial a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+  transition: text-decoration-color 180ms ease;
+}
+
+.prose-editorial a:hover {
+  text-decoration-color: var(--accent);
+}
+
+.prose-editorial strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.prose-editorial ul,
+.prose-editorial ol {
+  padding-left: 1.4em;
+  margin-top: 1.25em;
+}
+
+.prose-editorial ul {
+  list-style: disc;
+}
+
+.prose-editorial ol {
+  list-style: decimal;
+}
+
+.prose-editorial li + li {
+  margin-top: 0.5em;
+}
+
+.prose-editorial li::marker {
+  color: var(--ink-ghost);
+}
+
+.prose-editorial blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 16px;
+  margin-top: 1.6em;
+  color: var(--ink-muted);
+  font-size: 16px;
+}
+
+.prose-editorial blockquote p {
+  margin-top: 0;
+}
+
+.prose-editorial hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 2.6em 0;
+}
+
+.prose-editorial img {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-xs);
+  background-color: var(--chip);
+}
+
+.prose-editorial figcaption {
+  display: block;
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+/* 行内代码 */
+.prose-editorial :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background-color: var(--chip);
+  color: var(--ink);
+  padding: 2px 5px;
+  border-radius: var(--radius-xs);
+}
+
+/* 代码块：语言标签 + 复制按钮，结构由 markdown 渲染器产出 */
+.prose-editorial .code-block {
+  background-color: var(--code-bg);
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+}
+
+.prose-editorial .code-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px 0;
+}
+
+.prose-editorial .code-lang {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-ghost);
+}
+
+.prose-editorial .code-copy {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--line-strong);
+  cursor: pointer;
+  transition: color 180ms ease;
+}
+
+.prose-editorial .code-copy:hover {
+  color: var(--code-text);
+}
+
+.prose-editorial pre {
+  background-color: transparent;
+  color: var(--code-text);
+  padding: 12px 16px 16px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.prose-editorial pre code {
+  font-family: var(--font-mono);
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+
+/* 表格 */
+.prose-editorial table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  margin-top: 1.6em;
+}
+
+.prose-editorial th,
+.prose-editorial td {
+  border-bottom: 1px solid var(--line);
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.prose-editorial th {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
 }

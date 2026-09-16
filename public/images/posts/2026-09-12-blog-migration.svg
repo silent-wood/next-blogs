@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-label="示例配图占位">
+  <rect width="1600" height="900" fill="#EDE5D5"/>
+  <g stroke="#CFC4A8" stroke-width="2" fill="none">
+    <rect x="40" y="40" width="1520" height="820" rx="4"/>
+    <path d="M40 40 L1560 860 M1560 40 L40 860"/>
+  </g>
+  <text x="800" y="430" text-anchor="middle" font-family="ui-monospace, monospace" font-size="34" fill="#6B5B45" letter-spacing="4">
+    示例配图占位
+  </text>
+  <text x="800" y="486" text-anchor="middle" font-family="ui-monospace, monospace" font-size="20" fill="#8A7C63" letter-spacing="2">
+    1600 × 900 · 替换为真实图片后删除本文件
+  </text>
+</svg>
