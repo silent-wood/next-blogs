@@ -28,7 +28,7 @@ export default function TagsPage() {
         {tags.map((tag) => (
           <li key={tag.name}>
             <Link
-              href={`/tags/${encodeURIComponent(tag.name)}`}
+              href={`/tags/${tag.slug}`}
               className="inline-flex items-baseline gap-2 rounded-xs bg-chip px-3 py-2 transition-colors hover:bg-line"
             >
               <span className="text-[13px] text-ink-body">{tag.name}</span>

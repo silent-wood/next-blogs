@@ -245,7 +245,7 @@ export default function HomePage() {
                   className="flex items-baseline justify-between"
                 >
                   <Link
-                    href={`/categories/${encodeURIComponent(category.name)}`}
+                    href={`/categories/${category.slug}`}
                     className="text-[13px] text-ink-body transition-colors hover:text-ink"
                   >
                     {category.name}
@@ -265,7 +265,7 @@ export default function HomePage() {
               {tags.map((tag) => (
                 <li key={tag.name}>
                   <Link
-                    href={`/tags/${encodeURIComponent(tag.name)}`}
+                    href={`/tags/${tag.slug}`}
                     className="inline-block rounded-xs bg-chip px-2 py-1 font-mono text-[10px] text-ink-muted transition-colors hover:text-ink"
                   >
                     {tag.name}

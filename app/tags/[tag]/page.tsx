@@ -1,29 +1,37 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getPostsByTag, getTags } from "@/lib/posts";
+import { getPostsByTag, getTagBySlug, getTags } from "@/lib/posts";
 
 export const dynamicParams = false;
 
+/**
+ * 路由参数是标签的 ASCII slug（不是中文显示名）——原因见 lib/taxonomy.ts。
+ * 中文若直接进 URL，dev 下会被百分号编码，导致 Next 判定缺参数并 404。
+ */
 export function generateStaticParams() {
-  return getTags().map(({ name }) => ({ tag: name }));
+  return getTags().map(({ slug }) => ({ tag: slug }));
 }
 
 export async function generateMetadata(
   props: PageProps<"/tags/[tag]">,
 ): Promise<Metadata> {
-  const { tag } = await props.params;
-  const posts = getPostsByTag(tag);
+  const { tag: slug } = await props.params;
+  const taxon = getTagBySlug(slug);
+  if (!taxon) return { title: "标签未找到" };
+  const posts = getPostsByTag(taxon.name);
   return {
-    title: `标签：${tag}`,
-    description: `标签「${tag}」下的 ${posts.length} 篇文章。`,
-    alternates: { canonical: `/tags/${tag}` },
+    title: `标签：${taxon.name}`,
+    description: `标签「${taxon.name}」下的 ${posts.length} 篇文章。`,
+    alternates: { canonical: `/tags/${slug}` },
   };
 }
 
 export default async function TagPage(props: PageProps<"/tags/[tag]">) {
-  const { tag } = await props.params;
-  const posts = getPostsByTag(tag);
+  const { tag: slug } = await props.params;
+  const taxon = getTagBySlug(slug);
+  if (!taxon) notFound();
+  const posts = getPostsByTag(taxon.name);
   if (posts.length === 0) notFound();
 
   return (
@@ -34,7 +42,7 @@ export default async function TagPage(props: PageProps<"/tags/[tag]">) {
           <span className="eyebrow">TAG · 标签</span>
         </p>
         <h1 className="mt-5 font-serif text-[36px] font-bold text-ink lg:text-[44px]">
-          {tag}
+          {taxon.name}
         </h1>
         <p className="mt-3 text-[14px] text-ink-muted">{posts.length} 篇文章</p>
         <hr className="mt-8 border-line" />

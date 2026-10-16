@@ -9,20 +9,24 @@ export const siteConfig = {
   description:
     "李顺的个人博客。写技术笔记、生活碎片，和一些还没想清楚的问题——没有算法，没有广告，只有一个安静的阅读角落。",
   /** 站点主域名。部署到 Vercel 后在环境变量里覆盖为真实域名。 */
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://buxizhou.example.com",
+  url:
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://next-blogs-beryl.vercel.app",
   locale: "zh-CN",
   since: 2019,
 
   author: {
     name: "李顺",
     initials: "李",
-    email: "hi@buxizhou.com",
-    github: "https://github.com/lishun",
+    email: "silencewood@163.com",
+    github: "https://github.com/silent-wood",
     /** 关于页「联系」卡片，按需增删 */
     links: [
-      { label: "邮箱", value: "hi@buxizhou.com", href: "mailto:hi@buxizhou.com" },
-      { label: "GitHub", value: "github.com/lishun", href: "https://github.com/lishun" },
-      { label: "即刻", value: "@李顺", href: "https://web.okjike.com/" },
+      { label: "邮箱", value: "silencewood@163.com", href: "" },
+      {
+        label: "GitHub",
+        value: "github.com/silent-wood",
+        href: "https://github.com/silent-wood",
+      },
     ],
   },
 
@@ -49,7 +53,7 @@ export const siteConfig = {
   newsletter: {
     provider: "" as "" | "buttondown" | "mailchimp" | "custom",
     action: "",
-    note: "只写值得留下的东西。随时可以退订。",
+    note: "",
     placeholder: "your@email.com",
   },
 

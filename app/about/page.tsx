@@ -16,11 +16,7 @@ const DOING = [
   "把读过的书、走过的路，整理成可以重读的文字。",
 ];
 
-const NOW = [
-  { label: "在写", value: "一篇关于代码可读性的长文" },
-  { label: "在读", value: "《瓦尔登湖》· 第三次重读" },
-  { label: "在学", value: "木工 · 试着做一把小凳子" },
-];
+const NOW = [{ label: "在学", value: "AI Coding" }];
 
 const SITE_FACTS = [
   { key: "写作工具", value: "Obsidian · 手写初稿" },

@@ -46,6 +46,9 @@ summary: 摘要，显示在列表与分享卡。
 - md 文件放 `content/posts/`，**永远不要放 `public/`**（放进去会被原样下载）
 - 图片放 `public/images/posts/`，上传前压好（宽 ≤ 1600px，WebP/JPEG，单张 ≤ 300 KB；本站关闭了运行时图片优化）
 - 正文里引用图片用**绝对路径** `/images/...`，不要用相对路径
+- **标签 / 分类的 URL 一律用 ASCII slug**（标签「算法」→ `/tags/algorithm`）。新增中文词条后构建会**故意报错**，
+  需在 `lib/taxonomy.ts` 的 `SLUGS` 里登记 slug。原因：静态导出下中文参数在 dev 会被百分号编码，
+  Next 会判定 `generateStaticParams()` 缺参数并让页面 404。
 
 ## 目录结构
 
@@ -54,8 +57,8 @@ summary: 摘要，显示在列表与分享卡。
 │  ├─ page.tsx              首页
 │  ├─ posts/[slug]/         文章详情（构建期枚举全部路径）
 │  ├─ archive/              归档（按年分组）
-│  ├─ categories/[category] 分类
-│  ├─ tags/[tag]            标签
+│  ├─ categories/[category] 分类（参数为 ASCII slug）
+│  ├─ tags/[tag]            标签（参数为 ASCII slug）
 │  ├─ search/               搜索（构建期索引 + 客户端匹配）
 │  ├─ rss.xml/route.ts      RSS（构建期生成）
 │  ├─ search-index.json/    搜索索引（构建期生成）

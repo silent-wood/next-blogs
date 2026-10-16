@@ -32,7 +32,7 @@ export default function CategoriesPage() {
               <div className="flex items-baseline justify-between gap-4">
                 <h2 className="font-serif text-[22px] font-semibold text-ink">
                   <Link
-                    href={`/categories/${encodeURIComponent(category.name)}`}
+                    href={`/categories/${category.slug}`}
                     className="transition-opacity hover:opacity-75"
                   >
                     {category.name}

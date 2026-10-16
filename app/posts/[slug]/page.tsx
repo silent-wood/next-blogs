@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAdjacentPosts, getPostBySlug, getPostSlugs } from "@/lib/posts";
+import { slugifyTaxon } from "@/lib/taxonomy";
 import { siteConfig } from "@/lib/site.config";
 import { GiscusComments } from "@/components/giscus-comments";
 import { TableOfContents } from "@/components/table-of-contents";
@@ -50,7 +51,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
       <header>
         <div className="flex items-center gap-3.5">
           <Link
-            href={`/categories/${encodeURIComponent(post.category)}`}
+            href={`/categories/${slugifyTaxon(post.category)}`}
             className="rounded-sm bg-accent px-2.5 py-[5px] text-[10px] font-medium text-accent-contrast"
           >
             {post.category}
@@ -102,7 +103,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
             {post.tags.map((tag) => (
               <li key={tag}>
                 <Link
-                  href={`/tags/${encodeURIComponent(tag)}`}
+                  href={`/tags/${slugifyTaxon(tag)}`}
                   className="inline-block rounded-xs bg-chip px-2.5 py-1.5 text-[11px] text-ink-muted transition-colors hover:text-ink"
                 >
                   {tag}

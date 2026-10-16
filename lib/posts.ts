@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
 import { renderMarkdown, toPlainText, type TocItem } from "./markdown";
+import { slugifyTaxon } from "./taxonomy";
 
 /* ==========================================================================
    内容层：content/posts/*.md 是唯一数据源
@@ -176,7 +177,12 @@ export function getArchiveGroups(): ArchiveGroup[] {
     .map(([year, posts]) => ({ year, count: posts.length, posts }));
 }
 
-export type Taxon = { name: string; count: number };
+/**
+ * 分类 / 标签。
+ * `name` 是显示用的原始名称（可能是中文），`slug` 是路由参数用的 ASCII 标识。
+ * 二者可能不同，例如 name「算法」→ slug「algorithm」。见 lib/taxonomy.ts。
+ */
+export type Taxon = { name: string; slug: string; count: number };
 
 function tally(pick: (m: PostMeta) => string[]): Taxon[] {
   const counts = new Map<string, number>();
@@ -185,9 +191,23 @@ function tally(pick: (m: PostMeta) => string[]): Taxon[] {
       counts.set(name, (counts.get(name) ?? 0) + 1);
     }
   }
-  return [...counts.entries()]
-    .map(([name, count]) => ({ name, count }))
+  const taxa = [...counts.entries()]
+    .map(([name, count]) => ({ name, slug: slugifyTaxon(name), count }))
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh-CN"));
+
+  // 同一命名空间内 slug 必须唯一，否则两个词条会抢同一个页面
+  const seen = new Map<string, string>();
+  for (const { name, slug } of taxa) {
+    const clash = seen.get(slug);
+    if (clash !== undefined) {
+      throw new Error(
+        `[taxonomy] slug 冲突：「${clash}」与「${name}」都映射到 "${slug}"，` +
+          `请在 lib/taxonomy.ts 的 SLUGS 中区分。`,
+      );
+    }
+    seen.set(slug, name);
+  }
+  return taxa;
 }
 
 export function getCategories(): Taxon[] {
@@ -196,6 +216,16 @@ export function getCategories(): Taxon[] {
 
 export function getTags(): Taxon[] {
   return tally((m) => m.tags);
+}
+
+/** 按路由 slug 反查标签，找不到返回 null（由页面决定是否 notFound） */
+export function getTagBySlug(slug: string): Taxon | null {
+  return getTags().find((t) => t.slug === slug) ?? null;
+}
+
+/** 按路由 slug 反查分类，找不到返回 null */
+export function getCategoryBySlug(slug: string): Taxon | null {
+  return getCategories().find((c) => c.slug === slug) ?? null;
 }
 
 export function getPostsByCategory(category: string): PostMeta[] {

@@ -24,15 +24,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.7,
   }));
 
-  const categories: MetadataRoute.Sitemap = getCategories().map(({ name }) => ({
-    url: `${base}/categories/${encodeURIComponent(name)}`,
+  const categories: MetadataRoute.Sitemap = getCategories().map(({ slug }) => ({
+    url: `${base}/categories/${slug}`,
     lastModified: now,
     changeFrequency: "weekly",
     priority: 0.5,
   }));
 
-  const tags: MetadataRoute.Sitemap = getTags().map(({ name }) => ({
-    url: `${base}/tags/${encodeURIComponent(name)}`,
+  const tags: MetadataRoute.Sitemap = getTags().map(({ slug }) => ({
+    url: `${base}/tags/${slug}`,
     lastModified: now,
     changeFrequency: "weekly",
     priority: 0.4,

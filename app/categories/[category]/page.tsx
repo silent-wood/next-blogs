@@ -1,31 +1,39 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCategories, getPostsByCategory } from "@/lib/posts";
+import { getCategories, getCategoryBySlug, getPostsByCategory } from "@/lib/posts";
 
 export const dynamicParams = false;
 
+/**
+ * 路由参数是分类的 ASCII slug（不是中文显示名）——原因见 lib/taxonomy.ts。
+ * 中文若直接进 URL，dev 下会被百分号编码，导致 Next 判定缺参数并 404。
+ */
 export function generateStaticParams() {
-  return getCategories().map(({ name }) => ({ category: name }));
+  return getCategories().map(({ slug }) => ({ category: slug }));
 }
 
 export async function generateMetadata(
   props: PageProps<"/categories/[category]">,
 ): Promise<Metadata> {
-  const { category } = await props.params;
-  const posts = getPostsByCategory(category);
+  const { category: slug } = await props.params;
+  const taxon = getCategoryBySlug(slug);
+  if (!taxon) return { title: "分类未找到" };
+  const posts = getPostsByCategory(taxon.name);
   return {
-    title: `分类：${category}`,
-    description: `「${category}」分类下的 ${posts.length} 篇文章。`,
-    alternates: { canonical: `/categories/${category}` },
+    title: `分类：${taxon.name}`,
+    description: `「${taxon.name}」分类下的 ${posts.length} 篇文章。`,
+    alternates: { canonical: `/categories/${slug}` },
   };
 }
 
 export default async function CategoryPage(
   props: PageProps<"/categories/[category]">,
 ) {
-  const { category } = await props.params;
-  const posts = getPostsByCategory(category);
+  const { category: slug } = await props.params;
+  const taxon = getCategoryBySlug(slug);
+  if (!taxon) notFound();
+  const posts = getPostsByCategory(taxon.name);
   if (posts.length === 0) notFound();
 
   return (
@@ -36,7 +44,7 @@ export default async function CategoryPage(
           <span className="eyebrow">CATEGORY · 分类</span>
         </p>
         <h1 className="mt-5 font-serif text-[36px] font-bold text-ink lg:text-[44px]">
-          {category}
+          {taxon.name}
         </h1>
         <p className="mt-3 text-[14px] text-ink-muted">{posts.length} 篇文章</p>
         <hr className="mt-8 border-line" />
