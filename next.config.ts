@@ -13,6 +13,18 @@ const nextConfig: NextConfig = {
    */
   output: "export",
 
+  /**
+   * 让每个路由产出 `dir/index.html`，而不是 `dir.html`。
+   *
+   * 原因：`trailingSlash: false`（默认）时 Next 会同时产出 `about.html` 与 `about/` 目录
+   * （目录里只有 RSC 的 .txt、没有 index.html）。这种「文件与目录并存」的形态在静态托管上
+   * 的解析行为依赖各平台的实现细节。开启后结构唯一，GitHub Pages 会把 /about 301 到 /about/。
+   *
+   * 不受影响：带扩展名的 route handler（rss.xml / sitemap.xml / robots.txt /
+   * search-index.json）仍是文件；404.html 仍在产物根目录。
+   */
+  trailingSlash: true,
+
   /** 静态导出下 next/image 的默认 loader 不可用，关闭优化，按原尺寸输出。 */
   images: {
     unoptimized: true,

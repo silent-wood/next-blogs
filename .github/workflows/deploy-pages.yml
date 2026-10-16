@@ -1,0 +1,66 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Pages 部署走 OIDC：缺少 id-token: write 会在取部署令牌时 403。
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  # 必须 false：中断一次正在上传的部署，会把站点留在半成品状态。
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # package.json 里有 packageManager: pnpm@11.15.0，
+      # 因此这里必须省略 version 输入——两者同时指定会报 "Multiple versions of pnpm specified"。
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+      - name: Build
+        run: pnpm build
+        env:
+          # 决定 canonical / RSS / sitemap / og:url 里的绝对域名。
+          # 未配置仓库变量时回退到 Pages 地址，而不是源码里的 Vercel 占位域名。
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || 'https://silent-wood.github.io' }}
+
+      # 产物断言：three 个文件缺失就立刻失败，避免把空目录部署上线
+      - name: 校验产物
+        run: |
+          test -f out/index.html
+          test -f out/404.html
+          test -f out/search-index.json
+          test -d out/tags
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

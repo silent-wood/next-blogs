@@ -8,9 +8,14 @@ export const siteConfig = {
   tagline: "写代码，也写天气",
   description:
     "李顺的个人博客。写技术笔记、生活碎片，和一些还没想清楚的问题——没有算法，没有广告，只有一个安静的阅读角落。",
-  /** 站点主域名。部署到 Vercel 后在环境变量里覆盖为真实域名。 */
+  /**
+   * 站点主域名。影响 canonical / RSS / sitemap / og:url 里的绝对地址。
+   *
+   * 用 `||` 而不是 `??`：未配置的环境变量在 CI 里会展开成**空字符串**（不是 undefined），
+   * `??` 视其为有效值，会让 canonical 变成空域名。`||` 才能正确回退。
+   */
   url:
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://next-blogs-beryl.vercel.app",
+    process.env.NEXT_PUBLIC_SITE_URL || "https://next-blogs-beryl.vercel.app",
   locale: "zh-CN",
   since: 2019,
 
