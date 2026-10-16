@@ -10,16 +10,15 @@ import { siteConfig } from "@/lib/site.config";
 import { NewsletterCard } from "@/components/newsletter-card";
 
 /** 侧栏「现在」卡片：个人状态，改这里即可，不用动布局 */
-const NOW = [
-  { label: "在写", value: "一篇关于代码可读性的长文" },
-  { label: "在读", value: "《瓦尔登湖》· 第三次重读" },
-  { label: "在学", value: "木工 · 试着做一把小凳子" },
-];
+const NOW = [{ label: "在学", value: "AI Coding" }];
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
     <p className="flex items-center gap-2.5">
-      <span className="h-[5px] w-[5px] rounded-full bg-accent" aria-hidden="true" />
+      <span
+        className="h-[5px] w-[5px] rounded-full bg-accent"
+        aria-hidden="true"
+      />
       <span className="eyebrow">{children}</span>
     </p>
   );
@@ -39,12 +38,15 @@ export default function HomePage() {
       <div>
         {/* 首屏自述 */}
         <section>
-          <Eyebrow>WRITING SINCE {siteConfig.since} · 一个安静写字的地方</Eyebrow>
+          <Eyebrow>
+            WRITING SINCE {siteConfig.since} · 一个安静写字的地方
+          </Eyebrow>
           <h1 className="mt-5 font-serif text-[40px] font-bold leading-[1.15] text-ink sm:text-[48px] lg:text-[56px]">
             写代码，也写天气。
           </h1>
           <p className="mt-5 max-w-[560px] text-[15px] leading-[1.8] text-ink-muted">
-            我是{siteConfig.author.name}，一个在写字与写代码之间来回摆渡的人。这里放着我的技术笔记、生活碎片，和一些还没想清楚的问题——没有算法，没有广告，只有一个安静的阅读角落。
+            我是{siteConfig.author.name}
+            ，一个在写字与写代码之间来回摆渡的人。这里放着我的技术笔记、生活碎片，和一些还没想清楚的问题——没有算法，没有广告，只有一个安静的阅读角落。
           </p>
 
           <dl className="mt-8 flex gap-10">
@@ -99,7 +101,10 @@ export default function HomePage() {
               </p>
               <p className="mt-4 font-mono text-[10px] text-ink-faint">
                 {featured.readingMinutes} 分钟阅读 ·{" "}
-                <Link href={`/posts/${featured.slug}`} className="hover:text-ink">
+                <Link
+                  href={`/posts/${featured.slug}`}
+                  className="hover:text-ink"
+                >
                   阅读全文
                 </Link>
               </p>
@@ -178,7 +183,9 @@ export default function HomePage() {
             <dl className="mt-4 space-y-3">
               {NOW.map((item) => (
                 <div key={item.label}>
-                  <dt className="font-mono text-[10px] text-ink-ghost">{item.label}</dt>
+                  <dt className="font-mono text-[10px] text-ink-ghost">
+                    {item.label}
+                  </dt>
                   <dd className="mt-1 text-[12.5px] leading-[1.7] text-ink-body">
                     {item.value}
                   </dd>
@@ -219,7 +226,10 @@ export default function HomePage() {
                 RSS
               </a>
               {" / "}
-              <a href={`mailto:${siteConfig.author.email}`} className="hover:text-ink">
+              <a
+                href={`mailto:${siteConfig.author.email}`}
+                className="hover:text-ink"
+              >
                 邮件
               </a>
             </p>
@@ -230,7 +240,10 @@ export default function HomePage() {
             <p className="eyebrow">分类 · CATEGORIES</p>
             <ul className="mt-4 space-y-2.5">
               {categories.map((category) => (
-                <li key={category.name} className="flex items-baseline justify-between">
+                <li
+                  key={category.name}
+                  className="flex items-baseline justify-between"
+                >
                   <Link
                     href={`/categories/${encodeURIComponent(category.name)}`}
                     className="text-[13px] text-ink-body transition-colors hover:text-ink"

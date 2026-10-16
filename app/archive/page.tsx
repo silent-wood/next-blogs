@@ -13,17 +13,21 @@ export default function ArchivePage() {
   const stats = getSiteStats();
 
   return (
-    <div className="mx-auto max-w-[960px] px-5 pb-24 pt-12 lg:pt-16">
+    <div className="mx-auto max-w-240 px-5 pb-24 pt-12 lg:pt-16">
       <header>
         <p className="flex items-center gap-2.5">
-          <span className="h-[5px] w-[5px] rounded-full bg-accent" aria-hidden="true" />
+          <span
+            className="h-1.25 w-1.25 rounded-full bg-accent"
+            aria-hidden="true"
+          />
           <span className="eyebrow">ARCHIVE · 归档</span>
         </p>
         <h1 className="mt-5 font-serif text-[36px] font-bold text-ink lg:text-[48px]">
           全部文章
         </h1>
         <p className="mt-3 text-[14px] leading-[1.8] text-ink-muted">
-          按时间倒序排列。{stats.posts} 篇文章，跨越 {stats.years} 年，没有删除过任何一篇。
+          按时间倒序排列。{stats.posts} 篇文章，跨越 {stats.years}{" "}
+          年，没有删除过任何一篇。
         </p>
         <hr className="mt-8 border-line" />
       </header>
@@ -56,10 +60,12 @@ export default function ArchivePage() {
                       <span className="font-mono text-[12px] text-ink-ghost">
                         {post.monthDay}
                       </span>
-                      <span className="font-serif text-[16px] font-semibold leading-[1.5] text-ink transition-opacity group-hover:opacity-75 lg:text-[17px]">
+                      <span className="font-serif text-[16px] font-semibold leading-normal text-ink transition-opacity group-hover:opacity-75 lg:text-[17px]">
                         {post.title}
                       </span>
-                      <span className="text-[12px] text-ink-faint">{post.category}</span>
+                      <span className="text-[12px] text-ink-faint">
+                        {post.category}
+                      </span>
                     </Link>
                   </li>
                 ))}

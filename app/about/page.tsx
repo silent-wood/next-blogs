@@ -39,16 +39,19 @@ export default function AboutPage() {
   const stats = getSiteStats();
 
   return (
-    <div className="mx-auto grid max-w-[1440px] gap-12 px-5 pb-24 pt-12 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-16 lg:px-12 lg:pt-16">
-      <div className="max-w-[680px]">
+    <div className="mx-auto grid max-w-360 gap-12 px-5 pb-24 pt-12 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-16 lg:px-12 lg:pt-16">
+      <div className="max-w-170">
         {/* 头部 */}
         <header>
-          <span className="flex h-[76px] w-[76px] items-center justify-center rounded-full bg-accent font-serif text-[28px] font-semibold text-accent-contrast">
+          <span className="flex h-19 w-19 items-center justify-center rounded-full bg-accent font-serif text-[28px] font-semibold text-accent-contrast">
             {siteConfig.author.initials}
           </span>
 
           <p className="mt-6 flex items-center gap-2.5">
-            <span className="h-[5px] w-[5px] rounded-full bg-accent" aria-hidden="true" />
+            <span
+              className="h-1.25 w-1.25 rounded-full bg-accent"
+              aria-hidden="true"
+            />
             <span className="eyebrow">ABOUT · 关于</span>
           </p>
 
@@ -70,7 +73,11 @@ export default function AboutPage() {
                 <a
                   href={link.href}
                   target={link.href.startsWith("http") ? "_blank" : undefined}
-                  rel={link.href.startsWith("http") ? "noopener noreferrer" : undefined}
+                  rel={
+                    link.href.startsWith("http")
+                      ? "noopener noreferrer"
+                      : undefined
+                  }
                   className="transition-colors hover:text-ink"
                 >
                   {link.label}
@@ -93,7 +100,9 @@ export default function AboutPage() {
                 <span className="w-5 shrink-0 font-mono text-[11px] text-ink-ghost">
                   {String(index + 1).padStart(2, "0")}
                 </span>
-                <span className="text-[14px] leading-[1.8] text-ink-body">{item}</span>
+                <span className="text-[14px] leading-[1.8] text-ink-body">
+                  {item}
+                </span>
               </li>
             ))}
           </ol>
@@ -105,8 +114,9 @@ export default function AboutPage() {
             这个站点 · THE SITE
           </p>
           <p className="mt-4 text-[14px] leading-[1.85] text-ink-body">
-            「{siteConfig.name}」建于 {siteConfig.since} 年。目前收录 {stats.posts}{" "}
-            篇文章。文章以 Markdown 存于 Git 仓库，静态构建，全站没有追踪脚本，也不放广告。
+            「{siteConfig.name}」建于 {siteConfig.since} 年。目前收录{" "}
+            {stats.posts} 篇文章。文章以 Markdown 存于 Git
+            仓库，静态构建，全站没有追踪脚本，也不放广告。
           </p>
           <dl className="mt-6 space-y-0 border-t border-line">
             {SITE_FACTS.map((fact) => (
@@ -115,7 +125,9 @@ export default function AboutPage() {
                 className="flex items-baseline justify-between border-b border-line py-3"
               >
                 <dt className="text-[13px] text-ink-muted">{fact.key}</dt>
-                <dd className="font-mono text-[11px] text-ink-body">{fact.value}</dd>
+                <dd className="font-mono text-[11px] text-ink-body">
+                  {fact.value}
+                </dd>
               </div>
             ))}
           </dl>
@@ -147,12 +159,14 @@ export default function AboutPage() {
       {/* 侧栏 */}
       <aside className="lg:sticky lg:top-24 lg:self-start">
         <div className="space-y-8">
-          <section className="rounded-xs bg-card p-[18px]">
+          <section className="rounded-xs bg-card p-4.5">
             <p className="eyebrow">现在 · NOW</p>
             <dl className="mt-4 space-y-3">
               {NOW.map((item) => (
                 <div key={item.label}>
-                  <dt className="font-mono text-[10px] text-ink-ghost">{item.label}</dt>
+                  <dt className="font-mono text-[10px] text-ink-ghost">
+                    {item.label}
+                  </dt>
                   <dd className="mt-1 text-[12.5px] leading-[1.7] text-ink-body">
                     {item.value}
                   </dd>
@@ -161,7 +175,7 @@ export default function AboutPage() {
             </dl>
           </section>
 
-          <section className="rounded-xs bg-card p-[18px]">
+          <section className="rounded-xs bg-card p-4.5">
             <p className="eyebrow">联系 · CONTACT</p>
             <dl className="mt-4 space-y-0">
               {siteConfig.author.links.map((link) => (
@@ -173,9 +187,13 @@ export default function AboutPage() {
                   <dd className="font-mono text-[11px]">
                     <a
                       href={link.href}
-                      target={link.href.startsWith("http") ? "_blank" : undefined}
+                      target={
+                        link.href.startsWith("http") ? "_blank" : undefined
+                      }
                       rel={
-                        link.href.startsWith("http") ? "noopener noreferrer" : undefined
+                        link.href.startsWith("http")
+                          ? "noopener noreferrer"
+                          : undefined
                       }
                       className="text-ink-body transition-colors hover:text-ink"
                     >

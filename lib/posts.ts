@@ -60,7 +60,8 @@ function toDateString(value: unknown, fallback: string): string {
 }
 
 function toTags(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map((v) => String(v).trim()).filter(Boolean);
+  if (Array.isArray(value))
+    return value.map((v) => String(v).trim()).filter(Boolean);
   if (typeof value === "string") {
     return value
       .split(/[,，]/)
@@ -128,7 +129,6 @@ function loadAll(): PostRecord[] {
     .map(parsePost);
 
   const visible = INCLUDE_DRAFTS ? records : records.filter((r) => !r.draft);
-
   visible.sort((a, b) => (a.meta.date < b.meta.date ? 1 : -1));
   cache = visible;
   return cache;
