@@ -93,8 +93,9 @@ summary: 摘要，显示在列表与分享卡。
 
 ### 产线：GitHub Pages
 
-仓库名为 `silent-wood.github.io`，站点因此位于 GitHub Pages 的**根路径**，不需要 `basePath`。
-代码里没有任何一处依赖仓库名——将来绑自有域名，同样不需要改代码。
+站点通过自定义域名 `https://silencewood.cn` 提供服务，位于**根路径**，不需要 `basePath`。
+仓库名（`next-blogs`）与访问地址已解耦：GitHub Pages 的默认地址
+`silent-wood.github.io/next-blogs/` 会 301 到自定义域名，代码里没有任何一处依赖仓库名。
 
 走 **Actions 产物**路线（`.github/workflows/deploy-pages.yml`）：
 `push` 到 `main` → `pnpm install --frozen-lockfile` → `pnpm lint` → `pnpm build` → 校验产物 →
@@ -105,7 +106,7 @@ summary: 摘要，显示在列表与分享卡。
 1. 仓库 `Settings → Pages → Build and deployment → Source` 选 **GitHub Actions**
    （不要选 "Deploy from a branch"：那条路走的是不可定制的内部 Jekyll 构建，对 Next.js 基本不可用）
 2. `Settings → Secrets and variables → Actions → Variables` 新增 `NEXT_PUBLIC_SITE_URL`
-   = `https://silent-wood.github.io`（不带结尾斜杠）
+   = `https://silencewood.cn`（不带结尾斜杠）
 
 第 2 步是可选的：未配置时 workflow 会回退到同一个地址。显式配置只是更不容易踩空。
 
@@ -122,7 +123,7 @@ summary: 摘要，显示在列表与分享卡。
 
 Vercel 项目仍在，同一个 `main` 分支推送后两边都会构建。**但 canonical 只能有一个**：
 RSS / sitemap / `og:url` 里的绝对域名由 `NEXT_PUBLIC_SITE_URL` 决定，两个平台各读各的环境变量。
-若以 Pages 为准，请在 Vercel 项目里也把 `NEXT_PUBLIC_SITE_URL` 设为 `https://silent-wood.github.io`；
+若以 Pages 为准，请在 Vercel 项目里也把 `NEXT_PUBLIC_SITE_URL` 设为 `https://silencewood.cn`；
 或者直接下线 Vercel，避免同一份内容出现两个 canonical。
 
 **说明：**

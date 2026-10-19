@@ -38,8 +38,8 @@ jobs:
         run: pnpm build
         env:
           # 决定 canonical / RSS / sitemap / og:url 里的绝对域名。
-          # 未配置仓库变量时回退到 Pages 地址，而不是源码里的 Vercel 占位域名。
-          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || 'https://silent-wood.github.io' }}
+          # 未配置仓库变量时回退到自有域名，而不是已 404 的 silent-wood.github.io。
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || 'https://silencewood.cn' }}
 
       # 产物断言：three 个文件缺失就立刻失败，避免把空目录部署上线
       - name: 校验产物

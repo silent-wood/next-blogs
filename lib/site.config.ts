@@ -14,8 +14,7 @@ export const siteConfig = {
    * 用 `||` 而不是 `??`：未配置的环境变量在 CI 里会展开成**空字符串**（不是 undefined），
    * `??` 视其为有效值，会让 canonical 变成空域名。`||` 才能正确回退。
    */
-  url:
-    process.env.NEXT_PUBLIC_SITE_URL || "https://next-blogs-beryl.vercel.app",
+  url: process.env.NEXT_PUBLIC_SITE_URL || "https://silencewood.cn",
   locale: "zh-CN",
   since: 2019,
 
