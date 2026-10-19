@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getAdjacentPosts, getPostBySlug, getPostSlugs } from "@/lib/posts";
 import { slugifyTaxon } from "@/lib/taxonomy";
 import { siteConfig } from "@/lib/site.config";
+import { alternatesFor } from "@/lib/seo";
 import { GiscusComments } from "@/components/giscus-comments";
 import { TableOfContents } from "@/components/table-of-contents";
 
@@ -24,7 +25,7 @@ export async function generateMetadata(
   return {
     title: post.title,
     description: post.summary,
-    alternates: { canonical: `/posts/${post.slug}` },
+    alternates: alternatesFor(`/posts/${post.slug}`),
     openGraph: {
       type: "article",
       title: post.title,

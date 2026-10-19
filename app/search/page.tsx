@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { SearchClient } from "@/components/search-client";
+import { alternatesFor } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "搜索",
   description: "在全部文章中搜索标题、摘要与正文。",
-  alternates: { canonical: "/search" },
+  alternates: alternatesFor("/search"),
   /** 搜索页是纯交互页，不让搜索引擎收录 */
   robots: { index: false, follow: true },
 };

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
   getAllPosts,
@@ -7,7 +8,25 @@ import {
   getTags,
 } from "@/lib/posts";
 import { siteConfig } from "@/lib/site.config";
+import { alternatesFor } from "@/lib/seo";
 import { NewsletterCard } from "@/components/newsletter-card";
+
+/**
+ * 首页此前没有 canonical，也没有 og:url——它是全站唯一缺这两项的路由。
+ * openGraph 必须完整重写：Next 对它是浅合并，只写 url 会把父级的
+ * title / description / siteName 一并覆盖掉。
+ */
+export const metadata: Metadata = {
+  alternates: alternatesFor("/"),
+  openGraph: {
+    type: "website",
+    locale: siteConfig.locale,
+    siteName: siteConfig.name,
+    title: `${siteConfig.name} · ${siteConfig.tagline}`,
+    description: siteConfig.description,
+    url: "/",
+  },
+};
 
 /** 侧栏「现在」卡片：个人状态，改这里即可，不用动布局 */
 const NOW = [{ label: "在学", value: "AI Coding" }];

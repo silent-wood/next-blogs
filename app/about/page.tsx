@@ -3,11 +3,12 @@ import Link from "next/link";
 import { getSiteStats } from "@/lib/posts";
 import { siteConfig } from "@/lib/site.config";
 import { NewsletterCard } from "@/components/newsletter-card";
+import { alternatesFor } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "关于",
   description: `你好，我是${siteConfig.author.name}。写了六年代码，也写了六年字。`,
-  alternates: { canonical: "/about" },
+  alternates: alternatesFor("/about"),
 };
 
 const DOING = [

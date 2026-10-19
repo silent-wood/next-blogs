@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCategories, getPostsByCategory } from "@/lib/posts";
+import { alternatesFor } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "分类",
   description: "按主题浏览全部文章。",
-  alternates: { canonical: "/categories" },
+  alternates: alternatesFor("/categories"),
 };
 
 export default function CategoriesPage() {

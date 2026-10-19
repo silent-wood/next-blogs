@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCategories, getCategoryBySlug, getPostsByCategory } from "@/lib/posts";
+import { alternatesFor } from "@/lib/seo";
 
 export const dynamicParams = false;
 
@@ -23,7 +24,7 @@ export async function generateMetadata(
   return {
     title: `分类：${taxon.name}`,
     description: `「${taxon.name}」分类下的 ${posts.length} 篇文章。`,
-    alternates: { canonical: `/categories/${slug}` },
+    alternates: alternatesFor(`/categories/${slug}`),
   };
 }
 

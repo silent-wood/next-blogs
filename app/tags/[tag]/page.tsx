@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPostsByTag, getTagBySlug, getTags } from "@/lib/posts";
+import { alternatesFor } from "@/lib/seo";
 
 export const dynamicParams = false;
 
@@ -23,7 +24,7 @@ export async function generateMetadata(
   return {
     title: `标签：${taxon.name}`,
     description: `标签「${taxon.name}」下的 ${posts.length} 篇文章。`,
-    alternates: { canonical: `/tags/${slug}` },
+    alternates: alternatesFor(`/tags/${slug}`),
   };
 }
 

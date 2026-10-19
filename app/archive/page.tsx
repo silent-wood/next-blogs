@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getArchiveGroups, getSiteStats } from "@/lib/posts";
+import { alternatesFor } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "归档",
   description: "全部文章按时间倒序排列，一年一年，都在这里。",
-  alternates: { canonical: "/archive" },
+  alternates: alternatesFor("/archive"),
 };
 
 export default function ArchivePage() {

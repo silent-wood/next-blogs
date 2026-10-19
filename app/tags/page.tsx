@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getTags } from "@/lib/posts";
+import { alternatesFor } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "标签",
   description: "全部标签一览。",
-  alternates: { canonical: "/tags" },
+  alternates: alternatesFor("/tags"),
 };
 
 export default function TagsPage() {
