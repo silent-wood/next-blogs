@@ -1,0 +1,502 @@
+# =============================================================================
+# CI/CD 参考手册（仅供查阅）
+#
+# 【重要】这不是 workflow 文件，不参与任何执行。
+#   - 放在 .github/workflows/ 下的任何 .yml 都会被 GitHub Actions 当作 workflow 解析并运行，
+#     本文件若放进那个目录，要么每次 push 报 "invalid workflow"，要么被真的执行一次。
+#   - 所以它故意放在 docs/ 下，扩展名保留 .yml 只是为了让编辑器有 YAML 高亮与折叠。
+#   - 真正生效的流水线只有一处：.github/workflows/deploy-pages.yml
+#
+# 本文件的作用：把这个项目里 CI/CD 的全部内容（现有流程、字段含义、候选 job、
+# 本地命令、PR 流程、评审位置、回滚方式、故障对照）集中成一份可查询的清单。
+#
+# 约定：status 字段表示该条目当前处于什么状态
+#   live      已在线上运行
+#   proposed  讨论过、未落地
+#   rejected  明确不做，理由见 note
+# =============================================================================
+
+document:
+  title: next-blogs CI/CD 参考手册
+  updated: 2026-10-19
+  repo: silent-wood/next-blogs
+  site: https://silencewood.cn
+  live_workflow: .github/workflows/deploy-pages.yml
+  purpose: |
+    查询用。想确认"某一步为什么这么写""还能加什么 job""出问题该看哪里"时，
+    先查这里，不必翻 Actions 日志或历史对话。
+  maintenance: |
+    改了 deploy-pages.yml 之后同步更新 current_pipeline 段；
+    落地或放弃某个候选 job 时改它的 status，不要直接删条目。
+
+# -----------------------------------------------------------------------------
+# 一、概念：CI 与 CD 各自回答什么问题
+# -----------------------------------------------------------------------------
+concepts:
+
+  ci:
+    full_name: Continuous Integration（持续集成）
+    question: 这次改动有没有把东西弄坏？
+    how: 每次提交后自动跑静态检查、构建、测试，任一失败就拦住
+    in_this_project: lint + 类型检查（当前混在 build 内部）+ 产物断言
+
+  cd:
+    full_name: Continuous Deployment（持续部署）
+    question: 没坏的话，能不能自动送上线？
+    how: 把构建产物发布到托管平台，替换线上一版
+    in_this_project: upload-pages-artifact → deploy-pages
+
+  key_principle: |
+    两道门，不是一条线。CI 判断"对不对"，CD 执行"送不送"。
+    任一段失败即中止，失败的东西不会往下流，更不会上线。
+
+  cheap_first: |
+    阶段顺序不是随意的：便宜的检查排在前面。
+    lint 几秒能报错，就没必要等一分钟的 build；类型检查十几秒能发现的问题，
+    也不该拖到部署之后。
+
+  review_is_not_ci: |
+    code review 不在流水线里的任何一段。那五段都由命令组成（返回 0 或非 0），
+    review 的产出是"意见"，判断的是写法好坏而非对错。它挂在 PR 上，与 CI 并列。
+
+# -----------------------------------------------------------------------------
+# 二、流程总览：五段
+# -----------------------------------------------------------------------------
+pipeline_stages:
+
+  - order: 1
+    id: submit
+    name: 提交
+    what: push 或开 PR，触发流水线
+    current: "push: main 与 pull_request 都已触发；deploy job 有 if 挡住 PR 部署"
+    gap: PR 只跑检查，branch protection 与 review 未启用
+
+  - order: 2
+    id: static_check
+    name: 静态检查
+    what: 不执行代码，只读源码找错（格式、类型、内容约定）
+    duration: 秒级～十几秒
+    current: 只有 pnpm lint；类型检查混在 next build 内部
+    gap: typecheck 未独立；无内容校验
+
+  - order: 3
+    id: build
+    name: 构建
+    what: 真正跑一遍 next build，产出 out/
+    duration: 分钟级
+    current: 完整，另加产物断言
+    gap: 无
+
+  - order: 4
+    id: release
+    name: 发布
+    what: artifact 上传 → deploy-pages 替换线上一版
+    duration: 几十秒
+    current: 完整
+    gap: 无
+
+  - order: 5
+    id: verify
+    name: 线上验证
+    what: 对真实地址发请求，断言结果正确
+    duration: 十几秒
+    current: 无，全靠人工 curl
+    gap: |
+      这是本项目历史上故障最集中的一层。"部署成功"只说明每条命令返回 0，
+      不保证 canonical 换了域名、sitemap 没有旧地址、CSS 能加载。
+
+# -----------------------------------------------------------------------------
+# 三、当前流水线（对应 .github/workflows/deploy-pages.yml）
+# -----------------------------------------------------------------------------
+current_pipeline:
+
+  trigger:
+    push:
+      branches: [main]
+      note: 其他分支的 push 不触发，分支实验不会影响线上
+    pull_request:
+      note: |
+        PR 打开 / 更新（push 新 commit）/ 重新打开时触发，跑完整检查但不部署。
+        它不是在"PR 合并时"触发——合并产生的是 main 上的 push 事件。
+    workflow_dispatch:
+      note: 手动 Run workflow；改完仓库变量或 Custom domain 后用它重建，不必造一个空 commit
+
+  permissions:
+    contents: read
+    pages: write
+    id-token: write
+    note: |
+      最小可用原则。id-token 必须是 write——OIDC 令牌是"签发"出来的，
+      写成 read 会在取部署令牌那一步 403，且报错不会提示缺哪个权限。
+
+  concurrency:
+    group: pages
+    cancel-in-progress: false
+    note: |
+      必须 false。设 true 时新部署会打断正在上传的那一次，
+      站点停在"部分文件已替换"的中间状态，比部署失败更难修。
+
+  jobs:
+
+    - name: build
+      runs_on: ubuntu-latest
+      purpose: 源码 → 可部署产物 out/，不接触线上环境
+      steps:
+        - uses: actions/checkout@v7
+          why: 拉代码；默认 fetch-depth 1 够用，构建不读 git 历史
+        - uses: pnpm/action-setup@v6
+          why: 故意省略 version，版本唯一来源是 package.json 的 packageManager
+          pitfall: 两者同时给版本会报 Multiple versions of pnpm specified
+        - uses: actions/setup-node@v7
+          with:
+            node-version: 22
+            cache: pnpm
+          why: cache 缓存的是 pnpm store（依赖本体），不是 node_modules；命中时 install 约 10–15 秒
+        - run: pnpm install --frozen-lockfile
+          why: 锁文件与 package.json 不一致直接失败，避免本地与线上跑在不同版本上
+        - run: pnpm lint
+          why: 只覆盖 ESLint；类型检查由 next build 内部完成
+        - name: Build
+          run: pnpm build
+          env:
+            NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || 'https://silencewood.cn' }}
+          why: |
+            决定 canonical / RSS / sitemap / og:url 的绝对域名。
+            必须用 || 而非 ??：未配置的仓库变量在 CI 里是空字符串，
+            ?? 会放行并让 canonical 变成空域名。
+        - name: 校验产物
+          run: |
+            test -f out/index.html
+            test -f out/404.html
+            test -f out/search-index.json
+            test -d out/tags
+          why: 静态导出失败往往不抛异常，只是少生成文件；这一步防止把残缺目录发上线
+        - uses: actions/configure-pages@v6
+          why: 读取仓库 Pages 配置并校验是否已开通；未开通时在这里失败
+        - uses: actions/upload-pages-artifact@v5
+          with:
+            path: out
+          why: job 之间不共享文件系统，产物只能通过 artifact 传递
+          pitfall: path 必须是 out，不能是 .next（构建中间态，不可直接部署）
+
+    - name: deploy
+      needs: build
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      if_note: |
+        PR 触发的 run 里整块跳过（灰色 skipped，不是失败）。
+        少了这个条件，PR 一开就会把 PR 分支的产物发到线上。
+      runs_on: ubuntu-latest
+      purpose: 把 artifact 发布到 Pages
+      steps:
+        - id: deployment
+          uses: actions/deploy-pages@v5
+          why: 自动处理自定义域名、HTTPS 与 CDN 刷新，不需要 rsync / FTP
+      environment:
+        name: github-pages
+        url: ${{ steps.deployment.outputs.page_url }}
+        note: |
+          github-pages 是 GitHub 为 Pages 自动创建的环境，持有部署权限。
+          url 引用 deployment 这一步的输出，steps 的 id 必须与上面一致，否则链接为空。
+
+  data_flow: |
+    checkout → install → lint → build(out/) → 断言 → configure-pages
+      → upload-pages-artifact（打包 out/）
+      → [artifact]
+      → deploy job（needs: build）→ deploy-pages 取出 artifact 发布
+
+  artifact_note: |
+    needs 是"门禁"不是"数据通道"。build 成功 deploy 才启动，
+    但产物不是靠 needs 传的，是靠 artifact。
+
+  external_config:
+    - name: Pages Source
+      where: 仓库 Settings → Pages → Source
+      value: GitHub Actions
+      risk: 选 Deploy from a branch 会走 Jekyll，_next/ 被吞掉 → 白屏
+    - name: NEXT_PUBLIC_SITE_URL
+      where: Settings → Secrets and variables → Actions → Variables 标签页
+      value: https://silencewood.cn
+      risk: |
+        加到 Secrets（workflow 读 vars.）或加环境级（build job 没声明 environment:）
+        都不会报错，只是静默走回退值。
+    - name: Custom domain
+      where: 仓库 Settings → Pages
+      value: silencewood.cn
+      risk: 证书由 Let's Encrypt 自动签发并续期，域名掉了会先表现为 https 失败
+
+# -----------------------------------------------------------------------------
+# 四、候选 job：能加什么，加了拦什么
+# -----------------------------------------------------------------------------
+job_candidates:
+
+  - id: quality
+    name: 代码质量
+    status: proposed
+    priority: P1
+    duration: ~10s
+    content: pnpm lint + pnpm typecheck（tsc --noEmit）
+    catches: 类型错误提前暴露，不必等 build 跑完
+    snippet: |
+      quality:
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        steps:
+          - uses: actions/checkout@v7
+          - uses: pnpm/action-setup@v6
+          - uses: actions/setup-node@v7
+            with:
+              node-version: 22
+              cache: pnpm
+          - run: pnpm install --frozen-lockfile
+          - run: pnpm lint
+          - run: pnpm typecheck
+    benefit: |
+      拆成独立 job 后与 build 并行，总时长反而变短；
+      失败原因在 Actions 页面一眼可辨（两个独立红块）。
+    note: '需要 package.json 增加 "typecheck": "tsc --noEmit"'
+
+  - id: content-check
+    name: 内容校验
+    status: proposed
+    priority: P0
+    duration: ~2s
+    content: |
+      扫描 content/posts/*.md 的 frontmatter：
+      必填字段齐全、date 合法、slug 唯一、
+      tags 与 category 都能在 lib/taxonomy.ts 的 SLUGS 找到对应条目
+    catches: |
+      新增中文标签但忘记登记 slug —— 这是本项目真实踩过的坑，
+      当时表现为 dev 下 404 + E443，排查了很久。
+    advantage: 现在靠 build 阶段的 slugifyTaxon() 抛错兜底，代价是要等 install + 编译全部跑完
+    script: scripts/check-content.mjs
+
+  - id: link-check
+    name: 链接与图片检查
+    status: proposed
+    priority: P1
+    duration: ~30s
+    content: lychee 以 --offline 模式扫描 out/ 的 HTML
+    catches: 改 slug / 删文章 / 调整目录后的站内死链；文章引用了 /images/posts/x.png 但图没传
+    pitfall: |
+      不加 --offline 会连外链一起查，第三方站点超时一次 job 就红。
+      为了一个稳定检查换一个随机失败的任务，不值。
+
+  - id: image-budget
+    name: 图片体积检查
+    status: proposed
+    priority: P2
+    duration: ~5s
+    content: 校验 public/images/posts/ 下图片宽 ≤1600px、单张 ≤300KB
+    catches: README 里写明的约定，目前没有任何工具执行它
+    script: scripts/check-images.mjs
+
+  - id: smoke-test
+    name: 部署后冒烟
+    status: proposed
+    priority: P0
+    duration: ~20s
+    content: deploy 之后 curl 线上地址并断言
+    assertions:
+      - https://silencewood.cn/ 返回 200
+      - 首页含 rel="canonical" href="https://silencewood.cn/"
+      - sitemap.xml 里没有 silent-wood.github.io
+      - 任意文章页 200
+    catches: 部署成功但内容不对——变量丢失导致 canonical 退回旧域名、sitemap 未切换
+    snippet: |
+      smoke:
+        needs: deploy
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+          - name: 检查线上 canonical
+            run: |
+              html=$(curl -sf https://silencewood.cn/)
+              echo "$html" | grep -q 'rel="canonical" href="https://silencewood.cn/"'
+          - name: 检查 sitemap 域名
+            run: |
+              ! curl -sf https://silencewood.cn/sitemap.xml | grep -q 'silent-wood.github.io'
+    note: |
+      这是唯一真正访问线上环境的 job。前四个都在问"我做得对不对"，
+      只有它在问"线上是不是真的对了"。本项目历史故障全在这一层。
+
+  - id: lighthouse
+    name: Lighthouse 审计
+    status: proposed
+    priority: P3
+    tool: treosh/lighthouse-ci-action
+    catches: SEO、可访问性评分
+    warning: 不要给 Performance 设硬性阈值，静态站分数随网络波动，拦你的概率大于拦问题
+
+  - id: artifact-check-plus
+    name: 产物断言增强
+    status: proposed
+    priority: P2
+    content: 在现有断言上加 sitemap 域名是否正确、文章数 ≥ 37、rss.xml 可被 XML 解析
+
+  - id: dependabot
+    name: 依赖升级 PR
+    status: proposed
+    priority: P3
+    nature: 不是 job，是 .github/dependabot.yml 配置
+    note: 只有存在 pull_request CI 时才有意义，否则只是每周让你手动点合并
+
+  - id: schedule-check
+    name: 定时线上巡检
+    status: proposed
+    priority: P3
+    content: 每天 cron 跑一次证书剩余天数、首页 200、死链
+    note: 证书由 GitHub 自动续期，续期失败时没人会知道；但要等站点有真实访问量再说
+
+  - id: e2e
+    name: 端到端测试（Playwright）
+    status: rejected
+    reason: 全站唯一交互是搜索与主题切换，为两个功能维护浏览器环境不划算
+
+  - id: unit-test
+    name: 单元测试（Vitest）
+    status: rejected
+    reason: 没有业务逻辑；唯一值得测的 lib/posts.ts 解析逻辑已被 build + content-check 覆盖两遍
+
+  - id: codeql
+    name: CodeQL 安全扫描
+    status: rejected
+    reason: public 仓库免费，但 JS/TS 静态站基本不会出告警，属于装饰
+
+  - id: semantic-release
+    name: 语义化发布
+    status: rejected
+    reason: 个人博客无版本号需求，tag 没有人消费
+
+  - id: visual-regression
+    name: 视觉回归
+    status: rejected
+    reason: 没有 UI 库、没有设计稿，缺少对比基准
+
+# -----------------------------------------------------------------------------
+# 五、本地命令对照
+# -----------------------------------------------------------------------------
+local_commands:
+
+  dev: pnpm dev
+  build: pnpm build
+  lint: pnpm lint
+  typecheck: tsc --noEmit
+  preview_prod: python3 -m http.server --directory out
+  preview_note: |
+    模拟 Pages 的路径解析：/about 会 301 到 /about/，按目录取 index.html，
+    与线上行为一致，可在不部署的前提下验证深链。
+  validate_workflow: ruby -ryaml -e 'YAML.load_file(".github/workflows/deploy-pages.yml")'
+  validate_note: |
+    macOS 自带 ruby 即可校验 YAML，不必装 PyYAML。
+    注意 YAML 1.1 会把裸写的 on 解析成布尔 true，取值时要用 d[true]。
+
+# -----------------------------------------------------------------------------
+# 六、PR 流程（想练完整工程流程时才启用）
+# -----------------------------------------------------------------------------
+pull_request_flow:
+
+  status: partially_landed
+  why: |
+    现在直接 push main，没有"还没合并、但准备合并"的中间状态，
+    所以 review 无处安放，PR 门禁也无从谈起。
+  landed: |
+    on.pull_request 与 deploy job 的 if 条件已落地（2026-10-19）：
+    PR 会跑完整检查但不部署。剩下的 branch protection 与 review bot 未启用。
+
+  steps:
+    - main 开 branch protection，勾 Require a pull request before merging
+    - "workflow 的 on 增加 pull_request ［已完成］"
+    - "deploy job 增加 if: github.event_name == 'push' && github.ref == 'refs/heads/main' ［已完成］"
+    - 改动走分支 → 开 PR → CI 跑检查但不部署 → merge 后 main 才部署
+    - 可选：装 CodeRabbit（开源仓库有免费额度）或 Copilot code review
+
+  workflow_patch: |
+    on:
+      push:
+        branches: [main]
+      pull_request:
+
+    jobs:
+      deploy:
+        needs: [build]
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+  cost: 改一篇错别字也要走一遍 PR
+  benefit: 每次改动有 CI 门禁、有 review 记录、能单独回滚一个 PR
+
+  code_review:
+    position: 与 CI 并列，在 PR 合并之前，不属于任何一段流水线
+    why_pr_not_push: |
+      ① diff 基线不同：push 相对上一次 push（碎片），PR 相对 base 分支（完整变更）
+      ② 只有 PR 有状态（open / approved / merged），结论才能变成 required check 卡住合并
+      ③ push 逐次评会被噪音淹没，三天内就会被无视
+    tools: GitHub Copilot Code Review / CodeRabbit / Qodo Merge，全部 PR 事件驱动
+    verdict: |
+      单人博客收益接近零——review 的价值前提是"有第二个人会不同意"，这里不存在。
+      真想练手，拿有真实组件逻辑的仓库练。
+
+# -----------------------------------------------------------------------------
+# 七、回滚与失败处理
+# -----------------------------------------------------------------------------
+rollback:
+
+  mechanism: GitHub Pages 不保存历史版本，没有一键回滚按钮
+  recommended: git revert <commit> 再 push，等 CI 重新部署
+  why: 保证"线上 = main 最新 commit"这个不变量始终成立
+  alternative: |
+    Actions 里 re-run 某个旧 commit 的 run。
+    artifact 默认 90 天过期，过期后会重新构建那次 commit，结果一致但链路更绕。
+
+  on_ci_failure: |
+    部署失败时线上仍是上一版，这是好事；但不会收到任何通知。
+    要通知得自己加一个失败时发邮件或 webhook 的步骤。
+
+# -----------------------------------------------------------------------------
+# 八、故障对照表（本项目真实遇到过的）
+# -----------------------------------------------------------------------------
+troubleshooting:
+
+  - symptom: 站点显示的是 README 内容
+    cause: 仓库改名触发 Pages 自动开通，Source 走 Deploy from a branch，Jekyll 把 README 渲染成首页
+    detect: run 列表里出现名为 pages build and deployment 的 workflow
+    fix: Settings → Pages → Source 改成 GitHub Actions，成功部署一次即覆盖
+
+  - symptom: 页面白屏、CSS/JS 404
+    cause: 站点被放到 /<repo>/ 子路径，而产物是根绝对路径 /_next/...
+    fix: 绑自定义域名走根路径，或为项目配 basePath
+
+  - symptom: 中文标签页 404 + E443
+    cause: Next 16.3.5 dev 模式下编码参数与 generateStaticParams 的原始字符串对不上
+    fix: 标签/分类 URL 一律用 ASCII slug（lib/taxonomy.ts 的 SLUGS）
+
+  - symptom: 站点能打开，但 canonical / sitemap 指向旧域名
+    cause: NEXT_PUBLIC_SITE_URL 未配或配错位置
+    fix: Variables 标签页（非 Secrets、非环境级）配置后手动 Run workflow
+
+  - symptom: https 打不开、http 正常
+    cause: 证书未签发完成
+    fix: 等 10–60 分钟；超过 1 小时可把 Custom domain 删掉重填以重新触发申请
+
+  - symptom: DNSPod 添加第三条 A 记录被拒
+    cause: 免费版同一主机记录 A 记录负载均衡上限 2 条
+    fix: 只配 2 条即可，GitHub 那 4 个 IP 属同一集群，实测校验通过、站点正常
+
+  - symptom: workflow 报 Multiple versions of pnpm specified
+    cause: pnpm/action-setup 给了 version，package.json 又有 packageManager
+    fix: 删掉 action 里的 version
+
+  - symptom: 取部署令牌时 403
+    cause: "permissions 缺 id-token: write 或 pages: write"
+    fix: 补齐权限；报错信息不会提示缺哪个
+
+# -----------------------------------------------------------------------------
+# 九、发布前自查
+# -----------------------------------------------------------------------------
+checklist:
+
+  - 本地 pnpm build 通过，out/ 里有 index.html 与 404.html
+  - 新增的标签 / 分类已在 lib/taxonomy.ts 登记 slug
+  - 图片已压到宽 ≤1600px、≤300KB
+  - workflow YAML 用 ruby 校验过（缩进错一格整个 workflow 失效）
+  - 部署后 curl 首页与任意文章页，确认 200
+  - 确认 sitemap.xml 与 canonical 都是 https://silencewood.cn

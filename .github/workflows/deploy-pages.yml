@@ -1,66 +1,223 @@
+# =============================================================================
+# 部署到 GitHub Pages
+#
+# 触发：push 到 main → 自动构建 → 发布到 https://silencewood.cn
+# 结构：build（安装 → lint → 构建 → 产物断言）→ deploy（上传并发布）
+#
+# 注释分三层：
+#   ① 字段是什么、本项目填了什么值
+#   ② 为什么填这个值（不填 / 填错会怎样）
+#   ③ 这个文件之外、改错了这里看不出来的配置
+#
+# 这个文件之外还有三处配置在生效：
+#
+#   1. Settings → Pages → Source 必须是 "GitHub Actions"
+#      选成 "Deploy from a branch" 会走 GitHub 内置的 Jekyll 构建，
+#      Jekyll 默认忽略下划线开头的目录，_next/ 被吞掉 → 页面白屏。
+#
+#   2. 仓库变量 NEXT_PUBLIC_SITE_URL
+#      位置：Settings → Secrets and variables → Actions → **Variables** 标签页
+#      （不是 Secrets，workflow 读的是 vars.*，放错地方不会报错，只是静默失效）
+#      值：https://silencewood.cn（不带结尾斜杠）
+#
+#   3. Pages 的 Custom domain 已绑定 silencewood.cn
+#      证书由 GitHub 自动向 Let's Encrypt 申请，90 天有效，到期自动续期。
+#      勾选 Enforce HTTPS 后，http 请求会被 301 到 https。
+# =============================================================================
+
+# 【name】workflow 的名字。
+# 值 "Deploy to GitHub Pages" → 显示在 Actions 页面左侧列表、每次 run 的标题、
+# 以及仓库首页的 commit 状态徽章上。可以随便改，纯展示用途。
 name: Deploy to GitHub Pages
 
+# 【on】触发条件：这个 workflow 什么时候被创建出来。
+# 下面两个键是并列关系（任一满足就触发），不是先后顺序。
 on:
+  # 【push】有代码推送时触发。
   push:
+    # 【branches】限定只监听这些分支。
+    # 值 [main] → 其他分支 push 不会跑这个 workflow。
+    # 若写成 branches: ["*"] 或删掉这一行，任何分支 push 都会触发部署，
+    # 分支上的实验代码会直接上线。这是最危险的一种改法。
     branches: [main]
+
+  # 【pull_request】PR 事件触发：打开 / 更新（往 PR 推新 commit）/ 重新打开。
+  # 值：留空（无参数）→ 默认类型 [opened, synchronize, reopened]，
+  #     监听从任意分支发往任意分支的 PR。
+  #
+  # 不是"合并时"触发：合并那一刻产生的是 main 上的 push 事件，由上面的 push 负责。
+  # 它跑在 PR 自己的 head commit 上，与 main 的差异按 merge base 算，
+  # 不会去改 PR 分支——"先拉 main 进 PR 分支"这个动作并不存在。
+  #
+  # 加它之后，PR 会跑完整的 install / lint / build / 产物断言，但不会部署，
+  # 部署由下面 deploy job 的 if 条件挡住。
+  pull_request:
+
+  # 【workflow_dispatch】允许在 Actions 页面点 "Run workflow" 手动触发。
+  # 值：留空（无参数）。可以加 inputs: 定义手动填写参数，本项目不需要。
+  # 典型用途：改完仓库变量或 Custom domain 后，不产生新 commit 也要重建一次。
   workflow_dispatch:
 
-# Pages 部署走 OIDC：缺少 id-token: write 会在取部署令牌时 403。
+# 【permissions】GITHUB_TOKEN 的权限范围。
+# 原则是最小可用：不写这个块时，token 默认拿到仓库的大部分读写权限，
+# 对这个只读代码、只发站点的流程来说过宽。
+# 三个权限缺一不可，缺哪个就在对应步骤报 403。
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: read # 【contents】读仓库代码。checkout 拉取源码需要。
+  pages: write # 【pages】写 Pages 站点。upload / deploy 两个 action 需要。
+  id-token:
+    write # 【id-token】签发 OIDC 短期身份令牌。
+    # 值是 write 而不是 read——OIDC 令牌是"生成"出来的，不是"读取"的，
+    # 写成 read 会在"取部署令牌"那一步 403，且报错信息不会提示缺哪个权限。
 
+# 【concurrency】并发控制：同一个 group 内，同时只允许一个 run 在执行。
+# 没有这个块时，连续两次 push 会产生两个并行 run，后提交的先生效、
+# 先提交的后覆盖，线上内容与 main 的 HEAD 不一致。
 concurrency:
+  # 【group】并发分组名，相同名字的 run 互相排队。
+  # 值 pages → GitHub Pages 的约定命名，不要改成别的（改了就不与其他 Pages 流程互斥）。
   group: pages
-  # 必须 false：中断一次正在上传的部署，会把站点留在半成品状态。
+
+  # 【cancel-in-progress】新 run 到来时，是否中断正在跑的那个。
+  # 值 false → 排队等待，不中断。
+  # 必须保持 false：若设为 true，新部署会打断正在上传的那一次，
+  # 结果是站点停留在"部分文件已替换"的中间状态，比部署失败更糟。
   cancel-in-progress: false
 
+# 【jobs】任务是 workflow 的主体，一个 job 是一个独立的虚拟机。
+# 同一层级下没有 needs 关系的 job 会并行执行；本文件两个 job 是串行的。
 jobs:
+  # ---------------------------------------------------------------------------
+  # build：把源码变成可部署的静态产物 out/
+  # 这一步不接触线上环境，失败也不会影响已发布的站点。
+  # ---------------------------------------------------------------------------
   build:
+    # 【runs-on】运行这个 job 的机器。
+    # 值 ubuntu-latest → GitHub 托管的 Ubuntu 虚拟机（当前为 24.04）。
+    # public 仓库不消耗额度；私有仓库会按分钟计费。
     runs-on: ubuntu-latest
+
+    # 【steps】按顺序执行，任一步返回非 0 就中止，后面不再执行。
     steps:
+      # 【uses: actions/checkout@v7】把仓库代码拉进虚拟机的工作目录。
+      # @v7 是 commit SHA 的别名，建议锁大版本而不是 @main，避免上游改动导致今天能跑明天不能。
+      # 只取当前 commit：默认 fetch-depth: 1 已经够用，
+      # 构建过程不读 git 历史（文章按文件名和 frontmatter 排序，不依赖 git）。
       - uses: actions/checkout@v7
 
-      # package.json 里有 packageManager: pnpm@11.15.0，
-      # 因此这里必须省略 version 输入——两者同时指定会报 "Multiple versions of pnpm specified"。
+      # 【uses: pnpm/action-setup@v6】安装 pnpm，供后续命令使用。
+      # 故意不写 with: version —— package.json 里已有 packageManager: pnpm@11.15.0，
+      # 两者同时指定会报 "Multiple versions of pnpm specified" 并立刻失败。
+      # 版本只有一个来源（package.json），本地与 CI 才不会漂移。
       - uses: pnpm/action-setup@v6
 
+      # 【uses: actions/setup-node@v7】安装 Node.js 并接管依赖缓存。
       - uses: actions/setup-node@v7
         with:
+          # 【node-version】Node 主版本。
+          # 值 22 → 与本地一致（22.x）。写 "22" 会取该主版本的最新小版本，
+          # 写 "22.22.2" 则完全钉死。这里取前者，安全补丁自动跟上。
           node-version: 22
+
+          # 【cache】缓存策略。
+          # 值 pnpm → 缓存 pnpm store（依赖包本体），不是 node_modules。
+          # 命中缓存时 pnpm install 只需建立软链，通常 10–15 秒。
+          # 缓存 key 会自动带上 pnpm-lock.yaml 的哈希，锁文件一变就失效重建。
           cache: pnpm
 
+      # 【pnpm install --frozen-lockfile】
+      # --frozen-lockfile：package.json 与 pnpm-lock.yaml 不一致时直接失败。
+      # 不加这个参数，CI 会按 package.json 重新解析依赖，
+      # 于是本地和线上可能跑在不同版本上，而且完全无声。
       - run: pnpm install --frozen-lockfile
+
+      # 【pnpm lint】执行 ESLint。
+      # 注意 next build 内部也会做 TypeScript 类型检查，
+      # 这一行只覆盖 ESLint 规则（含 next/core-web-vitals 的写法约束）。
       - run: pnpm lint
 
+      # 构建。
       - name: Build
         run: pnpm build
+        # 【env】只对这一步生效的环境变量（不是 workflow 全局）。
         env:
           # 决定 canonical / RSS / sitemap / og:url 里的绝对域名。
-          # 未配置仓库变量时回退到自有域名，而不是已 404 的 silent-wood.github.io。
+          #
+          # 取值优先级：仓库变量 vars.NEXT_PUBLIC_SITE_URL → 回退值 'https://silencewood.cn'。
+          # 漏配或配错的表现是：站点能打开，但所有 SEO 元信息都指向错误的域名。
+          #
+          # 必须用 || 而不是 ??：未配置的仓库变量在 CI 里是空字符串而非 undefined
+          # （也没有 null），?? 只对 null/undefined 生效，会放行空字符串，
+          # 导致 canonical 变成 "/" 这种空域名。
           NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || 'https://silencewood.cn' }}
 
-      # 产物断言：three 个文件缺失就立刻失败，避免把空目录部署上线
+      # 产物断言。静态导出的失败往往不抛异常，只是少生成几个文件，
+      # 所以这里逐个检查关键产物，避免把空目录或残缺目录部署上线。
+      # test -f 判断文件存在，test -d 判断目录存在，任一不成立就返回非 0。
       - name: 校验产物
         run: |
-          test -f out/index.html
-          test -f out/404.html
-          test -f out/search-index.json
-          test -d out/tags
+          test -f out/index.html          # 首页
+          test -f out/404.html            # 静态导出会生成 404 页
+          test -f out/search-index.json   # 站内搜索的数据源
+          test -d out/tags                # 动态路由是否真的生成了目录
 
+      # 【actions/configure-pages@v6】读取仓库的 Pages 配置（自定义域名、base path 等）。
+      # outputs 里会给出 base_path / base_url 等值，供后续步骤使用；
+      # 本项目的产物是根绝对路径，因此不消费这些 outputs，只用它做配置校验。
+      # 若仓库尚未开通 Pages，这一步会失败，后面的步骤都不会执行。
       - uses: actions/configure-pages@v6
 
+      # 【actions/upload-pages-artifact@v5】把产物打包成 artifact，供 deploy job 取用。
+      # job 之间不共享文件系统——上一步生成的 out/ 无法被 deploy 直接看到，
+      # 产物只能通过 artifact 这条通道传递。
       - uses: actions/upload-pages-artifact@v5
         with:
+          # 【path】要打包的目录。
+          # 值 out → Next.js 配了 output: "export" 后的产物目录。
+          # 必须是 out 而不是 .next：.next 是构建中间态，不能直接部署。
           path: out
 
+  # ---------------------------------------------------------------------------
+  # deploy：把 artifact 发布到 Pages
+  # 只有 build 成功才会启动；build 失败时线上仍停留在上一版。
+  # ---------------------------------------------------------------------------
   deploy:
+    # 【needs】依赖的 job。
+    # 值 build → build 成功才启动；build 失败时不启动，线上自然保持上一版。
+    # 注意这是"门禁"，不是"数据传递"——产物靠 artifact 传，不靠 needs。
     needs: build
+
     runs-on: ubuntu-latest
+
+    # 【environment】把这个 job 关联到 GitHub 的 Environment。
     environment:
+      # 【name】环境名。
+      # 值 github-pages → GitHub 为 Pages 自动创建的环境。
+      # 它持有部署所需的权限，并在仓库的 Environments 里留下部署记录与历史。
+      # 不要改成自定义名字：改了就拿不到 Pages 的部署令牌。
       name: github-pages
+
+      # 【url】显示在 run 详情页上的"线上地址"链接。
+      # 值 ${{ steps.deployment.outputs.page_url }} → 引用下面 id: deployment 那一步
+      # 输出的真实地址（即 https://silencewood.cn/），不是写死的字符串。
+      # steps.<id>.outputs.<key> 是引用单个 step 输出的固定写法，
+      # 这里的 id 必须与下方 - id: deployment 一致，否则解析不到，链接为空。
       url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
+      # 【actions/deploy-pages@v5】取出 build 上传的 artifact 并发布到 Pages。
+      # 它会自动处理自定义域名、HTTPS 与 CDN 刷新，不需要额外的 rsync / FTP 步骤。
+      # id: deployment 让上面的 environment.url 能引用它的 page_url 输出。
       - id: deployment
         uses: actions/deploy-pages@v5
+
+    # 【if】job 的执行条件。不满足时整块跳过，显示为灰色 skipped，不算失败。
+    # 位置：job 内、与 needs / runs-on / steps 同级；写在 steps 之前或之后都合法，
+    #       YAML 的键顺序不影响语义，GitHub 读的是键而不是行号。
+    #
+    # 值：github.event_name == 'push' && github.ref == 'refs/heads/main'
+    #   ① event_name == 'push'         → PR 触发的那次 run 里，部署被跳过
+    #   ② ref == 'refs/heads/main'     → 排除手动 Run workflow 选分支时的误部署
+    # 缺 ① 的后果最严重：PR 一打开就把 PR 分支的产物发到线上。
+    # 参考：https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
