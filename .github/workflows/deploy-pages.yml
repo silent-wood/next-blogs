@@ -88,6 +88,50 @@ concurrency:
 # 同一层级下没有 needs 关系的 job 会并行执行；本文件两个 job 是串行的。
 jobs:
   # ---------------------------------------------------------------------------
+  # quality：只做检查，不产出任何东西。
+  # 它不 needs 任何人，也不被 build 依赖 —— 所以和 build 同时启动。
+  # deploy 同时 needs 它和 build，两个都绿才发布。
+  #
+  # 拆出来的三个理由：
+  #   ① 并行：lint 那十几秒被 build 吸收掉，总时长不变长甚至更短；
+  #   ② 归因：代码质量红和产物异常红是两个独立的方块，不用翻日志找是哪一步；
+  #   ③ 扩展：以后加规则（content-check、Prettier）只让这个 job 变长，build 不受影响。
+  #
+  # 代价是多一次 pnpm install。setup-node 的 cache: pnpm 命中后只需 10–15 秒，
+  # 且与 build 并行，净成本接近零 —— 但要注意：**job 之间不共享文件系统**，
+  # 这一次 install 是真实的第二次安装，不是复用。
+  # ---------------------------------------------------------------------------
+  quality:
+    runs-on: ubuntu-latest
+
+    # 卡死时最多占用 10 分钟，避免一个挂起的 job 把用量耗到默认的 6 小时。
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # 【pnpm lint】ESLint，只看语法树与规则，不做类型检查。
+      # 注意它的退出码只由 error 决定：warning 只打印、不拦截。
+      # 当前 @typescript-eslint/no-unused-vars 是 warning，
+      # 所以"有未使用变量"不会让这一步变红 —— 想让它拦，得在
+      # eslint.config.mjs 里把该规则提成 error，光加 --max-warnings=0 是另一条路。
+      - run: pnpm lint
+
+      # 【pnpm typecheck】tsc --noEmit，纯类型检查，不产出文件。
+      # 这是 ESLint 结构上做不到的部分：const n: number = "x" 在语法树里完全合法，
+      # 只有语义分析阶段才发现类型冲突。ESLint 只会报"n 未使用"。
+      # 耗时约 2 秒（tsconfig 里 incremental: true，.tsbuildinfo 已被 gitignore）。
+      # 必须先有 package.json 的 script "typecheck": "tsc --noEmit"，否则这一步报 command not found。
+      - run: pnpm typecheck
+
+  # ---------------------------------------------------------------------------
   # build：把源码变成可部署的静态产物 out/
   # 这一步不接触线上环境，失败也不会影响已发布的站点。
   # ---------------------------------------------------------------------------
@@ -96,6 +140,9 @@ jobs:
     # 值 ubuntu-latest → GitHub 托管的 Ubuntu 虚拟机（当前为 24.04）。
     # public 仓库不消耗额度；私有仓库会按分钟计费。
     runs-on: ubuntu-latest
+
+    # 卡死时最多占用 10 分钟。
+    timeout-minutes: 10
 
     # 【steps】按顺序执行，任一步返回非 0 就中止，后面不再执行。
     steps:
@@ -131,21 +178,21 @@ jobs:
       # 于是本地和线上可能跑在不同版本上，而且完全无声。
       - run: pnpm install --frozen-lockfile
 
-      # 【pnpm lint】执行 ESLint。
-      # 注意 next build 内部也会做 TypeScript 类型检查，
-      # 这一行只覆盖 ESLint 规则（含 next/core-web-vitals 的写法约束）。
-      - run: pnpm lint
+      # lint 已经不在这里了 —— 它搬到了上面的 quality job，和本 job 并行。
+      # 保留这条注释是为了避免以后有人以为"build 里少了 lint 是漏写"。
+      # 注意 next build 内部仍会做 TypeScript 类型检查，所以 build 失败也可能是类型错误。
 
-      # ${{ }} 是 GitHub 在把脚本交给 shell **之前**做的文本替换，
-      # 替换完才执行。所以 echo "${{ github.ref_name }}" 打印的是字面值，
+      # 【${{ }}】GitHub 在把脚本交给 shell **之前**做的文本替换，替换完才执行。
+      # 所以 echo "${{ github.ref_name }}" 打印的是字面值，
+      # 与 shell 自己的 $HOME、$PATH 是两套完全不同的机制。
       - name: 打印环境信息
         run: |
           echo "分支(ref_name): ${{ github.ref_name }}"
           echo "分支(head_ref): ${{ github.head_ref }}"
-          echo "完整 ref": ${{ github.ref }}
-          echo "事件类型(event_name): ${{ github.event_name }}"
-          echo "触发者": ${{ github.actor }}
-          echo "commit": ${{ github.sha }}
+          echo "完整 ref:       ${{ github.ref }}"
+          echo "事件类型:       ${{ github.event_name }}"
+          echo "触发者:         ${{ github.actor }}"
+          echo "commit:         ${{ github.sha }}"
           node -v
           pnpm -v
 
@@ -195,12 +242,18 @@ jobs:
   # 只有 build 成功才会启动；build 失败时线上仍停留在上一版。
   # ---------------------------------------------------------------------------
   deploy:
-    # 【needs】依赖的 job。
-    # 值 build → build 成功才启动；build 失败时不启动，线上自然保持上一版。
+    # 【needs】依赖的 job，可以写一个或多个。
+    # 值 [quality, build] → 两个都成功才启动；任一失败则不启动，线上自然保持上一版。
     # 注意这是"门禁"，不是"数据传递"——产物靠 artifact 传，不靠 needs。
-    needs: build
+    #
+    # 为什么是数组：quality 和 build 是并行的两条独立支线，
+    # 部署必须等两支都绿。写成 needs: build 会漏掉"lint 通过但 build 没等它"的情况。
+    needs: [quality, build]
 
     runs-on: ubuntu-latest
+
+    # 卡死时最多占用 10 分钟。
+    timeout-minutes: 10
 
     # 【environment】把这个 job 关联到 GitHub 的 Environment。
     environment:
@@ -234,3 +287,84 @@ jobs:
     # 缺 ① 的后果最严重：PR 一打开就把 PR 分支的产物发到线上。
     # 参考：https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+  # ---------------------------------------------------------------------------
+  # smoke：部署完成后访问真实线上地址，断言"线上真的对了"。
+  #
+  # 这一步回答的问题和前三个 job 不同：
+  #   quality / build  → 我做得对不对（命令都返回 0 吗）
+  #   deploy           → 产物送出去了吗
+  #   smoke            → **送达的东西正确吗**（域名、canonical、文件真的能打开吗）
+  #
+  # 之前踩过的坑全在这一层：部署成功、job 全绿，但 sitemap 还写着旧域名；
+  # 变量没配，canonical 悄悄退回默认值。这些都不会让任何命令返回非 0。
+  #
+  # needs: deploy 的连带效果 —— PR 事件里 deploy 被 if 跳过，smoke 也会跟着 skipped。
+  # 这是想要的：PR 没有部署，就没有"线上新版本"可验。
+  # ---------------------------------------------------------------------------
+  smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    # 【env】job 级环境变量，下面每个 step 都能读到。
+    # 放在这里是为了避免把域名写死在多行 shell 里 ——
+    # 换域名时只改这一处，而 step 级的 env 只在单步生效。
+    env:
+      SITE: https://silencewood.cn
+
+    steps:
+      # 【set -euo pipefail】三个开关都必要：
+      #   -e  任一命令返回非 0 立即退出（默认只检查最后一条命令）
+      #   -u  引用未定义变量报错（否则 $TYPO 展开成空串，断言变成永远通过）
+      #   -o pipefail  管道中任一环失败即失败（否则 curl | grep 只看 grep 的结果）
+      # 少了任何一个，这个 job 都可能"绿着通过"而实际什么都没验到。
+      - name: 首页返回 200 且 canonical 指向本域名
+        run: |
+          set -euo pipefail
+
+          # 重试：deploy 刚结束，CDN 传播可能有几十秒延迟，此时访问会拿到旧版本。
+          # 拿到 200 就跳出循环；6 次 × 10 秒 = 最多等 1 分钟。
+          # 用 if 而不是 `[ ... ] && break`：后者在 set -e 下的行为依赖
+          # "AND 列表中非最后命令的失败被忽略"这条规则，能跑但不好读。
+          for i in $(seq 1 6); do
+            code=$(curl -s -o /tmp/home.html -w '%{http_code}' "$SITE/")
+            if [ "$code" = "200" ]; then break; fi
+            echo "第 $i 次：HTTP $code，10 秒后重试"
+            sleep 10
+          done
+
+          test "$code" = "200" || { echo "FAIL 首页返回 $code"; exit 1; }
+          echo "OK 首页 200"
+
+          # canonical 必须是本域名。这条断言就是"变量没配"这个坑的守门人。
+          if ! grep -q 'rel="canonical" href="https://silencewood.cn/"' /tmp/home.html; then
+            echo "FAIL 首页 canonical 不是 https://silencewood.cn/"
+            grep -o '<link rel="canonical"[^>]*>' /tmp/home.html || echo "（页面里根本没有 canonical）"
+            exit 1
+          fi
+          echo "OK canonical 正确"
+
+      - name: sitemap 无旧域名残留且文章页可访问
+        run: |
+          set -euo pipefail
+
+          curl -sS "$SITE/sitemap.xml" -o /tmp/sitemap.xml
+
+          # 旧的 GitHub 地址一旦出现在 sitemap 里，搜索引擎会同时收录两个入口。
+          if grep -q 'silent-wood.github.io' /tmp/sitemap.xml; then
+            echo "FAIL sitemap 仍含旧域名 silent-wood.github.io"
+            grep -o '<loc>[^<]*</loc>' /tmp/sitemap.xml | head -3
+            exit 1
+          fi
+          echo "OK sitemap 无旧域名"
+
+          # 取 sitemap 里第 2 条 URL（第 1 条是首页），验证文章页真的能打开。
+          # 之所以不写死某篇文章：改 slug、删文章都会让硬编码的断言失效，
+          # 而这类"断言本身过期"的失败，比真的故障更难分辨。
+          url=$(grep -o '<loc>[^<]*</loc>' /tmp/sitemap.xml | sed -n '2p' | sed 's/<[^>]*>//g')
+          test -n "$url" || { echo "FAIL sitemap 里只有一条 URL"; exit 1; }
+
+          code=$(curl -s -o /dev/null -w '%{http_code}' "$url")
+          test "$code" = "200" || { echo "FAIL 文章页 $url 返回 $code"; exit 1; }
+          echo "OK 文章页 200：$url"

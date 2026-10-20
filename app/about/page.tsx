@@ -4,7 +4,6 @@ import { getSiteStats } from "@/lib/posts";
 import { siteConfig } from "@/lib/site.config";
 import { NewsletterCard } from "@/components/newsletter-card";
 import { alternatesFor } from "@/lib/seo";
-import { useState } from "react";
 
 export const metadata: Metadata = {
   title: "关于",
