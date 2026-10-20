@@ -28,8 +28,6 @@ export const metadata: Metadata = {
   },
 };
 
-const test = 1;
-
 /** 侧栏「现在」卡片：个人状态，改这里即可，不用动布局 */
 const NOW = [{ label: "在学", value: "AI Coding" }];
 

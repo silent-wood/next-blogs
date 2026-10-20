@@ -4,6 +4,7 @@ import { getSiteStats } from "@/lib/posts";
 import { siteConfig } from "@/lib/site.config";
 import { NewsletterCard } from "@/components/newsletter-card";
 import { alternatesFor } from "@/lib/seo";
+import { useState } from "react";
 
 export const metadata: Metadata = {
   title: "关于",
@@ -34,6 +35,12 @@ const MOMENTS = [
 
 export default function AboutPage() {
   const stats = getSiteStats();
+
+  if (true) {
+    const [v] = useState(0);
+  }
+
+  const num: number = "字符串";
 
   return (
     <div className="mx-auto grid max-w-360 gap-12 px-5 pb-24 pt-12 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-16 lg:px-12 lg:pt-16">
