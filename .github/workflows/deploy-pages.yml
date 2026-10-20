@@ -136,6 +136,19 @@ jobs:
       # 这一行只覆盖 ESLint 规则（含 next/core-web-vitals 的写法约束）。
       - run: pnpm lint
 
+      # ${{ }} 是 GitHub 在把脚本交给 shell **之前**做的文本替换，
+      # 替换完才执行。所以 echo "${{ github.ref_name }}" 打印的是字面值，
+      - name: 打印环境信息
+        run: |
+          echo "分支(ref_name): ${{ github.ref_name }}"
+          echo "分支(head_ref): ${{ github.head_ref }}"
+          echo "完整 ref": ${{ github.ref }}
+          echo "事件类型(event_name): ${{ github.event_name }}"
+          echo "触发者": ${{ github.actor }}
+          echo "commit": ${{ github.sha }}
+          node -v
+          pnpm -v
+
       # 构建。
       - name: Build
         run: pnpm build
