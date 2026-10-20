@@ -124,11 +124,14 @@ jobs:
       # eslint.config.mjs 里把该规则提成 error，光加 --max-warnings=0 是另一条路。
       - run: pnpm lint
 
-      # 【pnpm typecheck】tsc --noEmit，纯类型检查，不产出文件。
+      # 【pnpm typecheck】next typegen && tsc --noEmit，纯类型检查，不产出可部署文件。
       # 这是 ESLint 结构上做不到的部分：const n: number = "x" 在语法树里完全合法，
       # 只有语义分析阶段才发现类型冲突。ESLint 只会报"n 未使用"。
-      # 耗时约 2 秒（tsconfig 里 incremental: true，.tsbuildinfo 已被 gitignore）。
-      # 必须先有 package.json 的 script "typecheck": "tsc --noEmit"，否则这一步报 command not found。
+      # 耗时约 5 秒（tsconfig 里 incremental: true，.tsbuildinfo 已被 gitignore）。
+      # 前面的 next typegen 不能省：PageProps / LayoutProps 是 Next 16 在
+      # .next/types/ 里生成的全局类型，本地跑过 build 所以有，而本 job 是全新
+      # 虚拟机、没有 .next 目录 —— 不先生成，tsc 会满屏 TS2304 "Cannot find name"。
+      # 必须先有 package.json 的 script "typecheck"，否则这一步报 command not found。
       - run: pnpm typecheck
 
   # ---------------------------------------------------------------------------

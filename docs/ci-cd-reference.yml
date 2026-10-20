@@ -234,7 +234,7 @@ job_candidates:
     status: proposed
     priority: P1
     duration: ~10s
-    content: pnpm lint + pnpm typecheck（tsc --noEmit）
+    content: pnpm lint + pnpm typecheck（next typegen && tsc --noEmit）
     catches: 类型错误提前暴露，不必等 build 跑完
     snippet: |
       quality:
@@ -253,7 +253,8 @@ job_candidates:
     benefit: |
       拆成独立 job 后与 build 并行，总时长反而变短；
       失败原因在 Actions 页面一眼可辨（两个独立红块）。
-    note: '需要 package.json 增加 "typecheck": "tsc --noEmit"'
+    note: 'typecheck script 必须先跑 next typegen 再 tsc --noEmit：PageProps/LayoutProps
+      是 Next 16 生成在 .next/types/ 的全局类型，CI 干净环境没有该目录，不生成会满屏 TS2304'
 
   - id: content-check
     name: 内容校验
@@ -380,7 +381,7 @@ local_commands:
   dev: pnpm dev
   build: pnpm build
   lint: pnpm lint
-  typecheck: tsc --noEmit
+  typecheck: pnpm typecheck   # = next typegen && tsc --noEmit，删过 .next 后也能直接跑
   preview_prod: python3 -m http.server --directory out
   preview_note: |
     模拟 Pages 的路径解析：/about 会 301 到 /about/，按目录取 index.html，
