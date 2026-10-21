@@ -1,7 +1,7 @@
 # =============================================================================
 # 部署到 GitHub Pages
 #
-# 触发：push 到 main → 自动构建 → 发布到 https://silencewood.cn
+# 触发：push 到 main → 自动构建 → 发布到 https://blogs.silencewood.cn
 # 结构：build（安装 → lint → 构建 → 产物断言）→ deploy（上传并发布）
 #
 # 注释分三层：
@@ -18,9 +18,9 @@
 #   2. 仓库变量 NEXT_PUBLIC_SITE_URL
 #      位置：Settings → Secrets and variables → Actions → **Variables** 标签页
 #      （不是 Secrets，workflow 读的是 vars.*，放错地方不会报错，只是静默失效）
-#      值：https://silencewood.cn（不带结尾斜杠）
+#      值：https://blogs.silencewood.cn（不带结尾斜杠）
 #
-#   3. Pages 的 Custom domain 已绑定 silencewood.cn
+#   3. Pages 的 Custom domain 已绑定 blogs.silencewood.cn
 #      证书由 GitHub 自动向 Let's Encrypt 申请，90 天有效，到期自动续期。
 #      勾选 Enforce HTTPS 后，http 请求会被 301 到 https。
 # =============================================================================
@@ -143,13 +143,13 @@ jobs:
         env:
           # 决定 canonical / RSS / sitemap / og:url 里的绝对域名。
           #
-          # 取值优先级：仓库变量 vars.NEXT_PUBLIC_SITE_URL → 回退值 'https://silencewood.cn'。
+          # 取值优先级：仓库变量 vars.NEXT_PUBLIC_SITE_URL → 回退值 'https://blogs.silencewood.cn'。
           # 漏配或配错的表现是：站点能打开，但所有 SEO 元信息都指向错误的域名。
           #
           # 必须用 || 而不是 ??：未配置的仓库变量在 CI 里是空字符串而非 undefined
           # （也没有 null），?? 只对 null/undefined 生效，会放行空字符串，
           # 导致 canonical 变成 "/" 这种空域名。
-          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || 'https://silencewood.cn' }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || 'https://blogs.silencewood.cn' }}
 
       # 产物断言。静态导出的失败往往不抛异常，只是少生成几个文件，
       # 所以这里逐个检查关键产物，避免把空目录或残缺目录部署上线。
@@ -199,7 +199,7 @@ jobs:
 
       # 【url】显示在 run 详情页上的"线上地址"链接。
       # 值 ${{ steps.deployment.outputs.page_url }} → 引用下面 id: deployment 那一步
-      # 输出的真实地址（即 https://silencewood.cn/），不是写死的字符串。
+      # 输出的真实地址（即 https://blogs.silencewood.cn/），不是写死的字符串。
       # steps.<id>.outputs.<key> 是引用单个 step 输出的固定写法，
       # 这里的 id 必须与下方 - id: deployment 一致，否则解析不到，链接为空。
       url: ${{ steps.deployment.outputs.page_url }}

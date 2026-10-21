@@ -20,7 +20,7 @@ document:
   title: next-blogs CI/CD 参考手册
   updated: 2026-10-19
   repo: silent-wood/next-blogs
-  site: https://silencewood.cn
+  site: https://blogs.silencewood.cn
   live_workflow: .github/workflows/deploy-pages.yml
   purpose: |
     查询用。想确认"某一步为什么这么写""还能加什么 job""出问题该看哪里"时，
@@ -159,7 +159,7 @@ current_pipeline:
         - name: Build
           run: pnpm build
           env:
-            NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || 'https://silencewood.cn' }}
+            NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || 'https://blogs.silencewood.cn' }}
           why: |
             决定 canonical / RSS / sitemap / og:url 的绝对域名。
             必须用 || 而非 ??：未配置的仓库变量在 CI 里是空字符串，
@@ -215,13 +215,13 @@ current_pipeline:
       risk: 选 Deploy from a branch 会走 Jekyll，_next/ 被吞掉 → 白屏
     - name: NEXT_PUBLIC_SITE_URL
       where: Settings → Secrets and variables → Actions → Variables 标签页
-      value: https://silencewood.cn
+      value: https://blogs.silencewood.cn
       risk: |
         加到 Secrets（workflow 读 vars.）或加环境级（build job 没声明 environment:）
         都不会报错，只是静默走回退值。
     - name: Custom domain
       where: 仓库 Settings → Pages
-      value: silencewood.cn
+      value: blogs.silencewood.cn
       risk: 证书由 Let's Encrypt 自动签发并续期，域名掉了会先表现为 https 失败
 
 # -----------------------------------------------------------------------------
@@ -297,8 +297,8 @@ job_candidates:
     duration: ~20s
     content: deploy 之后 curl 线上地址并断言
     assertions:
-      - https://silencewood.cn/ 返回 200
-      - 首页含 rel="canonical" href="https://silencewood.cn/"
+      - https://blogs.silencewood.cn/ 返回 200
+      - 首页含 rel="canonical" href="https://blogs.silencewood.cn/"
       - sitemap.xml 里没有 silent-wood.github.io
       - 任意文章页 200
     catches: 部署成功但内容不对——变量丢失导致 canonical 退回旧域名、sitemap 未切换
@@ -310,11 +310,11 @@ job_candidates:
         steps:
           - name: 检查线上 canonical
             run: |
-              html=$(curl -sf https://silencewood.cn/)
-              echo "$html" | grep -q 'rel="canonical" href="https://silencewood.cn/"'
+              html=$(curl -sf https://blogs.silencewood.cn/)
+              echo "$html" | grep -q 'rel="canonical" href="https://blogs.silencewood.cn/"'
           - name: 检查 sitemap 域名
             run: |
-              ! curl -sf https://silencewood.cn/sitemap.xml | grep -q 'silent-wood.github.io'
+              ! curl -sf https://blogs.silencewood.cn/sitemap.xml | grep -q 'silent-wood.github.io'
     note: |
       这是唯一真正访问线上环境的 job。前四个都在问"我做得对不对"，
       只有它在问"线上是不是真的对了"。本项目历史故障全在这一层。
@@ -499,4 +499,4 @@ checklist:
   - 图片已压到宽 ≤1600px、≤300KB
   - workflow YAML 用 ruby 校验过（缩进错一格整个 workflow 失效）
   - 部署后 curl 首页与任意文章页，确认 200
-  - 确认 sitemap.xml 与 canonical 都是 https://silencewood.cn
+  - 确认 sitemap.xml 与 canonical 都是 https://blogs.silencewood.cn
